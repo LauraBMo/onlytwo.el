@@ -1,4 +1,4 @@
-;;; onlytwo-test.el --- the cases for the window-placement policy
+;;; onlytwo-test.el --- the cases for the window-placement policy -*- lexical-binding: t; -*-
 
 ;;   emacs -Q --batch -l ~/src/lisp/onlytwo.el/onlytwo-test.el ; echo "exit=$?"
 
@@ -86,6 +86,10 @@ machine that does not run Doom."
     (or (and (file-directory-p exact) exact)
         (car (last all)))))
 
+;; `helpful' is optional and loaded late, so the compiler cannot see this
+;; definition; declared rather than left as a warning.
+(declare-function helpful-callable "helpful" (symbol))
+
 (defun ot/load-helpful ()
   "Load the real helpful package, or return nil without signalling.
 Helpful is where the user's configuration put it -- here, Doom's straight build
@@ -130,7 +134,7 @@ Printed where the check would have been, and listed again in the summary."
     (setq ot/test-failures (1+ ot/test-failures))
     (princ (format "FAIL  %-38s expected %S, got %S\n" name expected got))))
 
-(defconst ot/test-buffers '("*A*" "*B*" "*C*" "*source.el*" "*dash*" "*doc*")
+(defconst ot/test-buffers '("*A*" "*B*" "*C*" "*source.el*" "*dash*" "*doc*" "*dired*")
   "Buffers the cases below display; reset (and emptied) before each one.")
 
 (defun ot/reset-buffers ()
@@ -338,6 +342,32 @@ carrying a `path' property."
 (display-buffer "*A*")
 (ot/check "8  re-display current pane" '("*A*" "*B*" side-by-side 2) (ot/state))
 
+;; 8b. Rule 8's other half: the discriminator itself.  A display that lands in
+;;     the pane BESIDE the selected one must leave the cursor where it was, since
+;;     no command of yours opened it.  Case 3b cannot show this -- there the
+;;     newcomer goes into the pane already selected, so a policy that took the
+;;     cursor unconditionally passed it too.  The second check keeps the first
+;;     honest: had the newcomer landed in the selected pane, "the cursor stayed
+;;     put" would have been true for the wrong reason.
+(let* ((wins (ot/two-windows "*A*" "*C*"))
+       (left (car wins))
+       (right (cadr wins)))
+  (display-buffer "*B*")
+  (ot/check "8b newcomer in the other pane" "*B*" (buffer-name (window-buffer right)))
+  (ot/check "8b top level: cursor stays put" t (eq (selected-window) left)))
+
+;; 8c. The same display, inside the command loop's hooks: this one is a command
+;;     of yours, so the cursor DOES follow the newcomer.  `run-hooks' is what the
+;;     loop does, so the case drives the real discriminator -- the flag the hooks
+;;     keep -- rather than setting the flag itself.
+(let* ((wins (ot/two-windows "*A*" "*C*"))
+       (right (cadr wins)))
+  (unwind-protect
+      (progn (run-hooks 'pre-command-hook)
+             (display-buffer "*B*"))
+    (run-hooks 'post-command-hook))
+  (ot/check "8c your own command: cursor moves" t (eq (selected-window) right)))
+
 ;;; 2. Links inside a helpful buffer
 
 ;; H1-H6b need the REAL helpful package; `ot/helpful-checks' names every check
@@ -518,6 +548,25 @@ carrying a `path' property."
 (display-buffer "*B*")
 (ot/check "D4 unrelated buffer, dashboard selected"
           '("*B*" single 1) (ot/state))
+
+;;; 4. Whole-frame buffers
+
+;; 9. Rule 5: a buffer whose major mode is in `onlytwo-full-frame-modes' takes
+;;    the frame -- and quitting it puts back the layout it displaced.  Nothing
+;;    in Emacs restores that split: `display-buffer-full-frame' saves nothing,
+;;    and no branch of `quit-restore-window' calls `set-window-configuration'.
+;;    So the action stores the configuration on the new window, and an `:around'
+;;    advice on `quit-window' restores it.  Both halves are exercised here, and
+;;    neither was before this case existed: deleting the advice left every other
+;;    case green.
+(ot/two-windows "*A*" "*C*")
+(ot/check "9  setup: two panes" '("*A*" "*C*" side-by-side 2) (ot/state))
+(with-current-buffer (get-buffer-create "*dired*")
+  (setq major-mode 'dired-mode))
+(display-buffer "*dired*")
+(ot/check "9b whole-frame mode takes the frame" '("*dired*" single 1) (ot/state))
+(quit-window)
+(ot/check "9c quitting it puts the layout back" '("*A*" "*C*" side-by-side 2) (ot/state))
 
 ;;; Verdict
 

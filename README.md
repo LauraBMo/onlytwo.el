@@ -165,7 +165,7 @@ out of Doom's build directory — the twelve are **skipped by name**, not counte
 passes, and the summary says so:
 
 ```
-ALL PASS: 21 passed, 0 failed, 12 skipped
+ALL PASS: 27 passed, 0 failed, 12 skipped
 SKIPPED (12, the real helpful package is not installed):
   H1 open help: policy, splits right
   ...

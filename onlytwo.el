@@ -3,10 +3,14 @@
 ;; Copyright (C) 2026 LauraBMo
 
 ;; Author: LauraBMo
+;; Maintainer: LauraBMo <laurea987@gmail.com>
+;; URL: https://github.com/LauraBMo/onlytwo.el
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "29.1"))
 ;; Keywords: windows, convenience
 ;; SPDX-License-Identifier: MIT
+
+;; This file is not part of GNU Emacs.
 
 ;;; Commentary:
 
@@ -66,7 +70,8 @@ What you ask for from one of these takes the window you asked from instead of
 the pane beside it -- following a link in a help buffer, or clicking a dashboard
 item.  A mode named here that is not loaded yet is harmless: `derived-mode-p'
 simply never matches it.  Modes without a parent (`helpful-mode' is one, as is
-`org-agenda-mode') have to be named; those derived from `special-mode' need not be."
+`org-agenda-mode') have to be named; those derived from `special-mode' need
+not be."
   :type '(repeat symbol))
 
 (defcustom onlytwo-full-frame-modes '(dired-mode ibuffer-mode elfeed-search-mode)
@@ -102,6 +107,10 @@ one, it would make a free pane look taken (rule 6)."
   "Display BUFFER in WINDOW, a pane, and return the window it landed in.
 Rule 3: a pane has no privileges, so a window dedicated to its buffer is
 un-dedicated rather than skipped.  Side windows never arrive here."
+  ;; Rule 3's clearing is belt-and-braces: measured on 30.2, the
+  ;; `window--display-buffer' call below clears the dedication itself, so no
+  ;; case can catch this line being deleted.  Kept because the package claims
+  ;; 29.1 too, and there it is unmeasured.
   (when (window-dedicated-p window)
     (set-window-dedicated-p window nil))
   (let ((window (window--display-buffer buffer window 'reuse alist)))
@@ -159,9 +168,10 @@ input from taking the cursor."
 
 (defun onlytwo-display-buffer (buffer alist)
   "Display BUFFER in one of the frame's panes, never creating a third.
-The pane on the right of the selected window; the selected window itself when the
-frame has no pane to its right, or when documentation is being read there; the
-frame's only pane split side by side, or reused when it cannot be split."
+The pane on the right of the selected window; the selected window itself
+when the frame has no pane to its right, or when documentation is being
+read there; the frame's only pane split side by side, or reused when it
+cannot be split."
   (or (display-buffer-reuse-window buffer alist)
       (let* ((selected (selected-window))
              (panes (onlytwo--pane-windows))
@@ -206,9 +216,10 @@ configuration is captured here for `onlytwo--quit-window-restore-a'."
 
 (defun onlytwo--quit-window-restore-a (fn &optional kill window)
   "Put back the layout a full-frame buffer displaced, then quit it (rule 5).
-`:around' rather than `:before': the configuration must be READ while the window
-is still alive (quitting may delete it), and restored only AFTER the original has
-run, or the restored layout's own window would be the one quit next."
+`:around' rather than `:before': the configuration must be READ while the
+window is still alive (quitting may delete it), and restored only AFTER the
+original has run, or the restored layout's own window would be the one quit
+next."
   (let* ((window (or window (selected-window)))
          (config (and (window-live-p window)
                       (window-parameter window 'onlytwo--saved-wconf))))
