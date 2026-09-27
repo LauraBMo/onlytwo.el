@@ -579,3 +579,5 @@ carrying a `path' property."
   (dolist (name (nreverse ot/skipped-names))
     (princ (format "  %s\n" name))))
 (kill-emacs (if (zerop ot/test-failures) 0 1))
+
+;;; onlytwo-test.el ends here
